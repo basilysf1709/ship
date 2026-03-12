@@ -1,17 +1,54 @@
-# ship
+<p align="center">
+  <img src="assets/logo.png" alt="ship Logo" width="200" />
+</p>
 
-Minimal infrastructure CLI for provisioning and controlling a single server on DigitalOcean, Hetzner, or Vultr.
+<h1 align="center">ship</h1>
 
-## Requirements
+<p align="center"><strong>Infrastructure for AI Coding Agents</strong></p>
 
-- Go 1.23+
-- Docker installed locally
-- A `Dockerfile` in the current project
-- One provider token exported in the environment:
-  - `DIGITALOCEAN_TOKEN`
-  - `HCLOUD_TOKEN`
-  - `VULTR_API_KEY`
-- SSH keys already registered with the selected provider
+<p align="center">
+An extremely lightweight infrastructure CLI for provisioning, deploying, tailing logs, and destroying servers.<br/>
+One binary. Zero dashboards. A minimal cloud control layer that agents can drive reliably.
+</p>
+
+<p align="center">
+  <a href="#build">Build</a> &bull;
+  <a href="#quick-start">Quick Start</a> &bull;
+  <a href="https://github.com/basilysf1709/ship">GitHub</a> &bull;
+  <a href="https://github.com/basilysf1709/ship/releases">Releases</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/providers-DigitalOcean%20%7C%20Hetzner%20%7C%20Vultr-blue" alt="providers" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="license" />
+  <img src="https://img.shields.io/github/v/release/basilysf1709/ship?color=orange&label=version" alt="version" />
+  <img src="https://img.shields.io/badge/language-Go-00ADD8" alt="language" />
+</p>
+
+## What is ship?
+
+`ship` is a minimal infrastructure primitive for AI coding agents.
+
+There are too many moments where an agent is working inside the terminal, then suddenly has to break context to provision a server, deploy code, fetch logs, or tear infrastructure down. That context switch is wasteful. `ship` keeps the entire flow inside the CLI so deployment can be handled directly by cloud-capable agents without leaving the terminal.
+
+The goal is simple: give agents a tiny, deterministic interface for infrastructure operations.
+
+**How it works:**
+
+1. **Create** a server with `ship server create`
+2. **Deploy** the current project with `ship deploy`
+3. **Inspect** the running app with `ship logs`
+4. **Destroy** the server with `ship server destroy`
+
+**Key features:**
+
+- **Minimal command surface**: only create, deploy, logs, and destroy
+- **Single binary**: build once with `go build -o ship`
+- **Provider support**: DigitalOcean, Hetzner, and Vultr
+- **Deterministic output**: machine-friendly `KEY=VALUE` responses
+- **No dashboard required**: everything happens from the terminal
+- **Docker-first deploy flow**: build locally, upload image, run container
+- **Local state tracking**: server metadata stored in `.ship/server.json`
 
 ## Build
 
@@ -19,12 +56,12 @@ Minimal infrastructure CLI for provisioning and controlling a single server on D
 go build -o ship
 ```
 
-## Usage
+## Quick Start
 
 ```bash
 export DIGITALOCEAN_TOKEN=...
 
-./ship server create
+./ship server create --provider digitalocean
 ./ship deploy
 ./ship logs
 ./ship server destroy
@@ -38,36 +75,61 @@ Provider selection:
 ./ship server create --provider vultr
 ```
 
-## Commands
+## Authentication
 
-### `ship server create`
+`ship` uses provider tokens from environment variables:
 
-Creates a server with provider-specific defaults:
+- `DIGITALOCEAN_TOKEN`
+- `HCLOUD_TOKEN`
+- `VULTR_API_KEY`
 
-- DigitalOcean
-  - Region: `nyc3`
-  - Size: `s-2vcpu-4gb`
-  - Image: `ubuntu-22-04-x64`
-- Hetzner
-  - Region: `nbg1`
-  - Size: `cx22`
-  - Image: `ubuntu-22.04`
-- Vultr
-  - Region: `ewr`
-  - Size: `vc2-2c-4gb`
-  - Image: `Ubuntu 22.04 x64`
+You only need to set the token for the provider you are using.
 
-The command waits for the server to become active, waits for SSH access, installs Docker, then stores server metadata in `.ship/server.json`.
+## Requirements
 
-Example output:
+- Go
+- Docker installed locally
+- A `Dockerfile` in the current project
+- SSH keys already registered with the selected provider
 
-```text
-STATUS=SERVER_CREATED
-SERVER_ID=12345
-SERVER_IP=1.2.3.4
+## Usage
+
+```bash
+ship server create
+ship deploy
+ship logs
+ship server destroy
 ```
 
-Override defaults if needed:
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `ship server create` | Create a server and install Docker |
+| `ship deploy` | Build Docker image locally and deploy it to the server |
+| `ship logs` | Fetch the last 100 log lines from the app container |
+| `ship server destroy` | Destroy the current server and remove local state |
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--provider <name>` | Choose provider: `digitalocean`, `hetzner`, or `vultr` |
+| `--region <region>` | Override the provider region or location |
+| `--size <size>` | Override the provider size, plan, or server type |
+| `--image <image>` | Override the provider image |
+
+## Providers
+
+Default create settings by provider:
+
+| Provider | Region | Size | Image |
+|---------|--------|------|-------|
+| DigitalOcean | `nyc3` | `s-2vcpu-4gb` | `ubuntu-22-04-x64` |
+| Hetzner | `nbg1` | `cx22` | `ubuntu-22.04` |
+| Vultr | `ewr` | `vc2-2c-4gb` | `Ubuntu 22.04 x64` |
+
+Examples:
 
 ```bash
 ./ship server create --provider digitalocean --region sfo3 --size s-1vcpu-2gb --image ubuntu-22-04-x64
@@ -75,9 +137,16 @@ Override defaults if needed:
 ./ship server create --provider vultr --region ord --size vc2-1c-2gb --image "Ubuntu 24.04 x64"
 ```
 
-### `ship deploy`
+## Deploy Flow
 
-Builds a local Docker image named `app`, saves it to `app.tar`, uploads it to the server, then runs:
+`ship deploy` assumes a `Dockerfile` exists in the current repository and runs:
+
+```bash
+docker build -t app .
+docker save app -o app.tar
+```
+
+Then it uploads the image to the server and runs:
 
 ```bash
 docker load -i /root/app.tar
@@ -93,20 +162,37 @@ STATUS=DEPLOY_COMPLETE
 SERVER_IP=1.2.3.4
 ```
 
-### `ship logs`
+## Server State
 
-Fetches the last 100 log lines from the `app` container:
-
-```bash
-./ship logs
-```
-
-### `ship server destroy`
-
-Deletes the server identified in `.ship/server.json` using the recorded provider and removes that local state file.
-
-Example output:
+Server metadata is stored locally in:
 
 ```text
-STATUS=SERVER_DESTROYED
+.ship/server.json
 ```
+
+Example:
+
+```json
+{
+  "provider": "digitalocean",
+  "server_id": "12345",
+  "ip": "1.2.3.4",
+  "ssh_user": "root"
+}
+```
+
+## Output Format
+
+All command output is designed to stay clean and machine-parseable:
+
+```text
+STATUS=SERVER_CREATED
+SERVER_ID=12345
+SERVER_IP=1.2.3.4
+```
+
+## Why it exists
+
+`ship` is for the gap between coding and infrastructure.
+
+When an AI coding agent is already operating in a terminal, it should not need a browser, a dashboard, or a separate deployment toolchain just to ship code. Provisioning, deployment, log access, and teardown should all be available as a small CLI primitive that agents can call directly and predictably.
