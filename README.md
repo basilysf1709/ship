@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="ship Logo" width="200" />
+  <img src="assets/logo.png" alt="ship Logo" width="320" />
 </p>
 
 <h1 align="center">ship</h1>
