@@ -17,6 +17,7 @@ One binary. Zero dashboards. A minimal cloud control layer that agents can drive
 <p align="center">
   <a href="#install">Install</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
+  <a href="#agent-skill">Agent Skill</a> &bull;
   <a href="https://github.com/basilysf1709/ship">GitHub</a> &bull;
   <a href="https://github.com/basilysf1709/ship/releases">Releases</a>
 </p>
@@ -64,6 +65,16 @@ go build -o ship
 ```bash
 curl -fsSL https://raw.githubusercontent.com/basilysf1709/ship/main/install.sh | sh
 ```
+
+## Agent Skill
+
+Download the reusable skill file directly:
+
+```bash
+curl -O https://raw.githubusercontent.com/basilysf1709/ship/main/Skills.md
+```
+
+This file is intended to be dropped into an agent workflow as a concise instruction sheet for using `ship`.
 
 ## Quick Start
 

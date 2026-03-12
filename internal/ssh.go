@@ -23,13 +23,18 @@ func WaitForSSH(ctx context.Context, user, host string, interval time.Duration) 
 	}
 
 	address := net.JoinHostPort(host, "22")
+	const maxAuthRetries = 5
+	authRetries := 0
 	for {
 		client, err := ssh.Dial("tcp", address, config)
 		if err == nil {
 			return client, nil
 		}
 		if isSSHAuthError(err) {
-			return nil, fmt.Errorf("SSH authentication failed for %s@%s; ensure this machine's SSH key is registered with the provider: %w", user, host, err)
+			authRetries++
+			if authRetries >= maxAuthRetries {
+				return nil, fmt.Errorf("SSH authentication failed for %s@%s; ensure this machine's SSH key is registered with the provider: %w", user, host, err)
+			}
 		}
 
 		select {
@@ -168,7 +173,11 @@ func authMethods() ([]ssh.AuthMethod, error) {
 	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
 		conn, err := net.Dial("unix", sock)
 		if err == nil {
-			methods = append(methods, ssh.PublicKeysCallback(agent.NewClient(conn).Signers))
+			agentClient := agent.NewClient(conn)
+			signers, err := agentClient.Signers()
+			if err == nil && len(signers) > 0 {
+				methods = append(methods, ssh.PublicKeysCallback(agentClient.Signers))
+			}
 		}
 	}
 
