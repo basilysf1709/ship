@@ -14,6 +14,7 @@ import (
 
 type Options struct {
 	ServerIP string
+	ServerID string
 	User     string
 }
 
@@ -53,9 +54,16 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
+	if opts.ServerIP != "" && HasLocalSecrets() {
+		uploads = append(uploads, ResolvedDeployUpload{
+			Source:      secretsPath(),
+			Destination: remoteSecretsPath,
+			Mode:        0o600,
+		})
+	}
 
 	if len(uploads) == 0 && len(deployConfig.RemoteCommands) == 0 {
-		return nil
+		return SaveReleaseRecord(NewReleaseRecord(serverStateFromOptions(opts), nil, nil))
 	}
 
 	client, err := waitForSSHClient(ctx, opts.User, opts.ServerIP, 10*time.Second)
@@ -64,21 +72,43 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer closeSSHClient(client)
 
-	if err := runRemoteCommands(ctx, client, remoteUploadMkdirCommands(uploads)); err != nil {
+	releaseRecord := NewReleaseRecord(serverStateFromOptions(opts), deployConfig.RemoteCommands, nil)
+	releaseDir := path.Join(remoteReleaseRoot, releaseRecord.ID)
+
+	preCopyCommands := remoteUploadMkdirCommands(uploads)
+	if len(uploads) > 0 {
+		preCopyCommands = append(preCopyCommands, fmt.Sprintf("mkdir -p %s", shellQuote(releaseDir)))
+	}
+	if err := runRemoteCommands(ctx, client, preCopyCommands); err != nil {
 		return err
 	}
 
+	releaseUploads := make([]ReleaseUpload, 0, len(uploads))
 	for _, upload := range uploads {
 		if err := copyDeployFile(ctx, client, upload.Source, upload.Destination, upload.Mode); err != nil {
 			return err
 		}
+		if upload.Destination == remoteSecretsPath {
+			continue
+		}
+		backupPath := path.Join(releaseDir, releaseBackupName(len(releaseUploads), upload.Destination))
+		if err := runRemoteCommands(ctx, client, []string{
+			fmt.Sprintf("cp %s %s", shellQuote(upload.Destination), shellQuote(backupPath)),
+		}); err != nil {
+			return err
+		}
+		releaseUploads = append(releaseUploads, ReleaseUpload{
+			Destination: upload.Destination,
+			BackupPath:  backupPath,
+		})
 	}
 
 	if err := runRemoteCommands(ctx, client, deployConfig.RemoteCommands); err != nil {
 		return err
 	}
 
-	return nil
+	releaseRecord.Uploads = releaseUploads
+	return SaveReleaseRecord(releaseRecord)
 }
 
 func runLocalShellCommand(ctx context.Context, command string) error {
@@ -139,4 +169,19 @@ func remoteUploadMkdirCommands(uploads []ResolvedDeployUpload) []string {
 		commands = append(commands, fmt.Sprintf("mkdir -p %s", shellQuote(parent)))
 	}
 	return commands
+}
+
+func serverStateFromOptions(opts Options) *ServerState {
+	if opts.ServerIP == "" && opts.ServerID == "" {
+		return nil
+	}
+	return &ServerState{
+		ServerID: opts.ServerID,
+		IP:       opts.ServerIP,
+		SSHUser:  opts.User,
+	}
+}
+
+func releaseBackupName(index int, destination string) string {
+	return fmt.Sprintf("%02d-%s", index, path.Base(destination))
 }

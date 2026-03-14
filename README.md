@@ -41,16 +41,18 @@ The goal is simple: give agents a tiny, deterministic interface for infrastructu
 
 1. **Create** a server with `ship server create`
 2. **Deploy** the current project with `ship deploy`
-3. **Inspect** the running app with `ship logs`
-4. **List** locally tracked servers with `ship server list`
-5. **Destroy** the server with `ship server destroy`
+3. **Inspect and operate** with `ship status`, `ship logs`, and `ship exec`
+4. **Manage secrets and releases** with `ship secrets`, `ship release list`, and `ship rollback`
+5. **List** locally tracked servers with `ship server list`
+6. **Destroy** the server with `ship server destroy`
 
 **Key features:**
 
-- **Minimal command surface**: only create, deploy, logs, and destroy
+- **Operator commands**: status, exec, secrets, release history, rollback, bootstrap, and domain setup
 - **Single binary**: build once with `go build -o ship`
 - **Provider support**: DigitalOcean, Hetzner, and Vultr
 - **Deterministic output**: machine-friendly `KEY=VALUE` responses
+- **Structured JSON mode**: pass `--json` for machine-readable output
 - **No dashboard required**: everything happens from the terminal
 - **Configurable deploy flow**: use `ship.json` for project-specific deploy steps
 - **Local state tracking**: server metadata stored in `.ship/server.json`
@@ -131,7 +133,11 @@ If a matching local private key is not available, server creation can succeed bu
 ```bash
 ship server create
 ship deploy
+ship status
 ship logs
+ship exec -- uname -a
+ship secrets list
+ship release list
 ship server destroy
 ```
 
@@ -142,6 +148,14 @@ ship server destroy
 | `ship server create` | Create a server, install Docker, and track it locally |
 | `ship server list` | Show a table of locally tracked servers on this machine |
 | `ship deploy` | Run the project's configured deploy flow, or the default Docker deploy if no config is present |
+| `ship status` | Show SSH reachability, app status, healthcheck result, and last release |
+| `ship exec` | Run a remote command on the current server |
+| `ship secrets` | Manage local secrets and sync them to the current server |
+| `ship release list` | Show tracked release history for the current project |
+| `ship rollback` | Restore a previous uploaded release and rerun its remote commands |
+| `ship bootstrap` | Apply bootstrap packages, proxy, and remote setup commands to the current server |
+| `ship domain setup` | Configure Caddy reverse proxy and automatic TLS for domains |
+| `ship init` | Generate a starter `ship.json` template |
 | `ship logs` | Fetch the last 100 log lines from the app container |
 | `ship server destroy` | Destroy the current server and remove local state |
 
@@ -215,6 +229,12 @@ Fields:
 - `remote_commands`: shell commands run on the server in order
 - `cleanup_local`: local files removed after deploy finishes
 
+Additional top-level config blocks:
+
+- `bootstrap`: packages and remote commands to apply during `ship server create` or `ship bootstrap`
+- `proxy`: domains and `app_port` for `ship domain setup` and default reverse-proxy deploys
+- `status`: `healthcheck_url` or `healthcheck_path` for `ship status`
+
 ### Default deploy flow
 
 If no `ship.json` deploy config exists, `ship deploy` assumes a `Dockerfile` exists and runs:
@@ -252,6 +272,18 @@ Machine-wide server inventory is stored in:
 
 ```text
 ~/.ship/servers.json
+```
+
+Project release history is stored in:
+
+```text
+.ship/releases.json
+```
+
+Local secrets are stored in:
+
+```text
+.ship/secrets.env
 ```
 
 Example:

@@ -7,12 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const projectConfigFile = "ship.json"
 
 type ProjectConfig struct {
-	Deploy *DeployConfig `json:"deploy,omitempty"`
+	Deploy    *DeployConfig    `json:"deploy,omitempty"`
+	Bootstrap *BootstrapConfig `json:"bootstrap,omitempty"`
+	Proxy     *ProxyConfig     `json:"proxy,omitempty"`
+	Status    *StatusConfig    `json:"status,omitempty"`
 }
 
 type DeployConfig struct {
@@ -20,6 +24,21 @@ type DeployConfig struct {
 	Uploads        []DeployUpload `json:"uploads,omitempty"`
 	RemoteCommands []string       `json:"remote_commands,omitempty"`
 	CleanupLocal   []string       `json:"cleanup_local,omitempty"`
+}
+
+type BootstrapConfig struct {
+	Packages       []string `json:"packages,omitempty"`
+	RemoteCommands []string `json:"remote_commands,omitempty"`
+}
+
+type ProxyConfig struct {
+	Domains []string `json:"domains,omitempty"`
+	AppPort int      `json:"app_port,omitempty"`
+}
+
+type StatusConfig struct {
+	HealthcheckURL  string `json:"healthcheck_url,omitempty"`
+	HealthcheckPath string `json:"healthcheck_path,omitempty"`
 }
 
 type DeployUpload struct {
@@ -38,32 +57,63 @@ func (c DeployConfig) RequiresServer() bool {
 	return len(c.Uploads) > 0 || len(c.RemoteCommands) > 0
 }
 
-func LoadDeployConfig() (DeployConfig, error) {
-	data, err := os.ReadFile(projectConfigFile)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return defaultDeployConfig(), nil
-		}
-		return DeployConfig{}, fmt.Errorf("read %s: %w", projectConfigFile, err)
+func (c ProxyConfig) EffectiveAppPort() int {
+	if c.AppPort <= 0 {
+		return 8080
 	}
-
-	var projectConfig ProjectConfig
-	if err := json.Unmarshal(data, &projectConfig); err != nil {
-		return DeployConfig{}, fmt.Errorf("parse %s: %w", projectConfigFile, err)
-	}
-
-	if projectConfig.Deploy == nil {
-		return defaultDeployConfig(), nil
-	}
-
-	if err := projectConfig.Deploy.validate(); err != nil {
-		return DeployConfig{}, err
-	}
-
-	return *projectConfig.Deploy, nil
+	return c.AppPort
 }
 
-func defaultDeployConfig() DeployConfig {
+func (c ProxyConfig) HasDomains() bool {
+	return len(c.Domains) > 0
+}
+
+func LoadProjectConfig() (ProjectConfig, error) {
+	var projectConfig ProjectConfig
+	data, err := os.ReadFile(projectConfigFile)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return ProjectConfig{}, fmt.Errorf("read %s: %w", projectConfigFile, err)
+		}
+	} else if err := json.Unmarshal(data, &projectConfig); err != nil {
+		return ProjectConfig{}, fmt.Errorf("parse %s: %w", projectConfigFile, err)
+	}
+
+	if err := projectConfig.validate(); err != nil {
+		return ProjectConfig{}, err
+	}
+	runtimeConfig, err := LoadRuntimeConfig()
+	if err != nil {
+		return ProjectConfig{}, err
+	}
+	if projectConfig.Proxy == nil && runtimeConfig.Proxy != nil {
+		proxyCopy := *runtimeConfig.Proxy
+		projectConfig.Proxy = &proxyCopy
+	}
+
+	return projectConfig, nil
+}
+
+func LoadDeployConfig() (DeployConfig, error) {
+	projectConfig, err := LoadProjectConfig()
+	if err != nil {
+		return DeployConfig{}, err
+	}
+	return projectConfig.EffectiveDeployConfig()
+}
+
+func (c ProjectConfig) EffectiveDeployConfig() (DeployConfig, error) {
+	if c.Deploy != nil {
+		return *c.Deploy, nil
+	}
+	return defaultDeployConfig(c.Proxy), nil
+}
+
+func defaultDeployConfig(proxy *ProxyConfig) DeployConfig {
+	portBinding := "80:80"
+	if proxy != nil && proxy.HasDomains() {
+		portBinding = fmt.Sprintf("127.0.0.1:%d:80", proxy.EffectiveAppPort())
+	}
 	return DeployConfig{
 		LocalCommands: []string{
 			"docker build -t app .",
@@ -80,7 +130,7 @@ func defaultDeployConfig() DeployConfig {
 			"docker load -i /root/app.tar",
 			"docker stop app || true",
 			"docker rm app || true",
-			"docker run -d --name app -p 80:80 app",
+			fmt.Sprintf("if [ -f /root/.ship/secrets.env ]; then docker run -d --name app --env-file /root/.ship/secrets.env -p %s app; else docker run -d --name app -p %s app; fi", portBinding, portBinding),
 		},
 		CleanupLocal: []string{"app.tar"},
 	}
@@ -135,6 +185,25 @@ func (c DeployConfig) validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (c ProjectConfig) validate() error {
+	if c.Deploy != nil {
+		if err := c.Deploy.validate(); err != nil {
+			return err
+		}
+	}
+	if c.Proxy != nil {
+		if c.Proxy.AppPort < 0 {
+			return fmt.Errorf("%s proxy app_port must be greater than zero", projectConfigFile)
+		}
+		for _, domain := range c.Proxy.Domains {
+			if strings.TrimSpace(domain) == "" {
+				return fmt.Errorf("%s proxy domains cannot contain empty values", projectConfigFile)
+			}
+		}
+	}
 	return nil
 }
 

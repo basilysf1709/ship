@@ -14,7 +14,15 @@ func Execute() error {
 }
 
 func init() {
+	rootCmd.AddCommand(newBootstrapCommand())
 	rootCmd.AddCommand(newDeployCommand())
+	rootCmd.AddCommand(newDomainCommand())
+	rootCmd.AddCommand(newExecCommand())
+	rootCmd.AddCommand(newInitCommand())
 	rootCmd.AddCommand(newLogsCommand())
+	rootCmd.AddCommand(newReleaseCommand())
+	rootCmd.AddCommand(newRollbackCommand())
+	rootCmd.AddCommand(newSecretsCommand())
 	rootCmd.AddCommand(newServerCommand())
+	rootCmd.AddCommand(newStatusCommand())
 }

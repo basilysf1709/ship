@@ -11,6 +11,12 @@ import (
 	shipinternal "ship/internal"
 )
 
+var createProvider = shipinternal.New
+var waitForCreatedServerSSH = shipinternal.WaitForSSH
+var runCreatedServerSetup = shipinternal.RunCommands
+var saveCreatedServerState = shipinternal.SaveServerState
+var addCreatedServerInventory = shipinternal.AddServerInventoryRecord
+
 func newServerCommand() *cobra.Command {
 	serverCmd := &cobra.Command{
 		Use:   "server",
@@ -40,7 +46,7 @@ func newServerCreateCommand() *cobra.Command {
 				return fmt.Errorf("resolve current directory: %w", err)
 			}
 
-			provider, err := shipinternal.New(providerName)
+			provider, err := createProvider(providerName)
 			if err != nil {
 				return err
 			}
@@ -59,13 +65,22 @@ func newServerCreateCommand() *cobra.Command {
 				state.SSHUser = "root"
 			}
 
-			sshClient, err := shipinternal.WaitForSSH(ctx, state.SSHUser, state.IP, 10*time.Second)
+			if err := saveCreatedServerState(state); err != nil {
+				return err
+			}
+			if err := addCreatedServerInventory(state, projectPath); err != nil {
+				return err
+			}
+
+			sshClient, err := waitForCreatedServerSSH(ctx, state.SSHUser, state.IP, 10*time.Second)
 			if err != nil {
 				return err
 			}
-			defer sshClient.Close()
+			if sshClient != nil {
+				defer sshClient.Close()
+			}
 
-			if err := shipinternal.RunCommands(ctx, sshClient, []string{
+			if err := runCreatedServerSetup(ctx, sshClient, []string{
 				"apt update",
 				"apt install -y docker.io",
 				"systemctl enable docker",
@@ -74,15 +89,19 @@ func newServerCreateCommand() *cobra.Command {
 				return err
 			}
 
-			if err := shipinternal.SaveServerState(state); err != nil {
+			projectConfig, err := loadProjectConfig()
+			if err != nil {
 				return err
 			}
-			if err := shipinternal.AddServerInventoryRecord(state, projectPath); err != nil {
+			if err := applyBootstrap(ctx, sshClient, projectConfig); err != nil {
 				return err
 			}
 
-			fmt.Printf("STATUS=SERVER_CREATED\nSERVER_ID=%s\nSERVER_IP=%s\n", state.ServerID, state.IP)
-			return nil
+			return writeCommandOutput(cmd, fmt.Sprintf("STATUS=SERVER_CREATED\nSERVER_ID=%s\nSERVER_IP=%s\n", state.ServerID, state.IP), map[string]any{
+				"status":    "SERVER_CREATED",
+				"server_id": state.ServerID,
+				"server_ip": state.IP,
+			})
 		},
 	}
 

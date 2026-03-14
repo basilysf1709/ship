@@ -13,6 +13,7 @@ import (
 const shipDir = ".ship"
 const serverFile = "server.json"
 const inventoryFile = "servers.json"
+const runtimeFile = "runtime.json"
 
 var userHomeDir = os.UserHomeDir
 
@@ -32,6 +33,10 @@ type ServerRecord struct {
 	CreatedAt   string `json:"created_at,omitempty"`
 }
 
+type RuntimeConfig struct {
+	Proxy *ProxyConfig `json:"proxy,omitempty"`
+}
+
 func serverStatePath() string {
 	return filepath.Join(shipDir, serverFile)
 }
@@ -42,6 +47,10 @@ func inventoryPath() (string, error) {
 		return "", fmt.Errorf("resolve user home directory: %w", err)
 	}
 	return filepath.Join(home, shipDir, inventoryFile), nil
+}
+
+func runtimeConfigPath() string {
+	return filepath.Join(shipDir, runtimeFile)
 }
 
 func SaveServerState(state ServerState) error {
@@ -202,4 +211,44 @@ func saveServerInventory(records []ServerRecord) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+func LoadRuntimeConfig() (RuntimeConfig, error) {
+	data, err := os.ReadFile(runtimeConfigPath())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return RuntimeConfig{}, nil
+		}
+		return RuntimeConfig{}, fmt.Errorf("read %s: %w", runtimeConfigPath(), err)
+	}
+
+	var config RuntimeConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("parse %s: %w", runtimeConfigPath(), err)
+	}
+	return config, nil
+}
+
+func SaveRuntimeConfig(config RuntimeConfig) error {
+	if err := os.MkdirAll(shipDir, 0o755); err != nil {
+		return fmt.Errorf("create .ship directory: %w", err)
+	}
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal runtime config: %w", err)
+	}
+	if err := os.WriteFile(runtimeConfigPath(), data, 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", runtimeConfigPath(), err)
+	}
+	return nil
+}
+
+func SaveProxyRuntimeConfig(proxy ProxyConfig) error {
+	runtimeConfig, err := LoadRuntimeConfig()
+	if err != nil {
+		return err
+	}
+	proxyCopy := proxy
+	runtimeConfig.Proxy = &proxyCopy
+	return SaveRuntimeConfig(runtimeConfig)
 }

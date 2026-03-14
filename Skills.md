@@ -8,7 +8,15 @@ Use `ship` as the infrastructure CLI for provisioning, deploying, inspecting, an
 
 - `ship server create`
 - `ship deploy`
+- `ship status`
+- `ship exec`
 - `ship logs`
+- `ship secrets`
+- `ship release list`
+- `ship rollback`
+- `ship bootstrap`
+- `ship domain setup`
+- `ship init`
 - `ship server list`
 - `ship server destroy`
 
@@ -73,9 +81,15 @@ ship server create --provider digitalocean --region sfo3 --size s-1vcpu-2gb --im
 ## Expected behavior
 
 - `ship server create` provisions a server, registers an SSH key if needed, installs Docker, and stores state in `.ship/server.json`.
+- `ship status` reports SSH reachability, app status, healthcheck status, and the latest tracked release.
+- `ship exec` runs a one-off remote command on the tracked server.
+- `ship secrets` manages `.ship/secrets.env` locally and can sync it to `/root/.ship/secrets.env` on the server.
+- `ship release list` shows tracked local release history, and `ship rollback` restores a previous release.
+- `ship bootstrap` applies package installs, proxy config, and custom remote commands from `ship.json`.
+- `ship domain setup` configures Caddy with automatic TLS for configured domains.
+- `ship init` writes a starter `ship.json` template for common app shapes.
 - `ship deploy` follows the repo's `ship.json` deploy recipe when present; otherwise it uses the default Docker deploy flow.
 - `ship server list` shows the locally tracked server inventory for the current machine.
-- `ship deploy` follows the repo's `ship.json` deploy recipe when present; otherwise it uses the default Docker deploy flow.
 - `ship logs` fetches recent logs from the app container.
 - `ship server destroy` removes the server and clears local state.
 

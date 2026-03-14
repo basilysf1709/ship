@@ -3,6 +3,7 @@ package shipinternal
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -159,5 +160,43 @@ func TestLoadDeployConfigRejectsEmptyDeployBlock(t *testing.T) {
 
 	if _, err := LoadDeployConfig(); err == nil {
 		t.Fatal("LoadDeployConfig returned nil error for empty deploy block")
+	}
+}
+
+func TestLoadDeployConfigUsesSavedRuntimeProxyWhenProjectConfigHasNone(t *testing.T) {
+	tempDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWD)
+	}()
+
+	if err := os.MkdirAll(".ship", 0o755); err != nil {
+		t.Fatalf("mkdir .ship: %v", err)
+	}
+	runtimeConfig := `{
+  "proxy": {
+    "domains": ["example.com"],
+    "app_port": 9090
+  }
+}`
+	if err := os.WriteFile(filepath.Join(".ship", "runtime.json"), []byte(runtimeConfig), 0o600); err != nil {
+		t.Fatalf("write runtime.json: %v", err)
+	}
+
+	config, err := LoadDeployConfig()
+	if err != nil {
+		t.Fatalf("LoadDeployConfig returned error: %v", err)
+	}
+	if len(config.RemoteCommands) == 0 {
+		t.Fatal("RemoteCommands was empty")
+	}
+	if !strings.Contains(config.RemoteCommands[len(config.RemoteCommands)-1], "127.0.0.1:9090:80") {
+		t.Fatalf("default deploy command = %q", config.RemoteCommands[len(config.RemoteCommands)-1])
 	}
 }

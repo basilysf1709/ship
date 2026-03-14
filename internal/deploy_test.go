@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -131,13 +130,23 @@ func TestRunCreatesRemoteUploadDirectoriesBeforeCopy(t *testing.T) {
 
 	want := []string{
 		"ssh",
-		"remote:mkdir -p '/opt/app'",
+		"remote:mkdir -p '/opt/app' && mkdir -p '/root/.ship/releases/20260314T024257.842919000Z'",
 		"copy:/opt/app/release.tar.gz",
+		"remote:cp '/opt/app/release.tar.gz' '/root/.ship/releases/20260314T024257.842919000Z/00-release.tar.gz'",
 		"remote:tar -xzf /opt/app/release.tar.gz -C /opt/app",
 		"close",
 	}
-	if !reflect.DeepEqual(events, want) {
+	if len(events) != len(want) {
+		t.Fatalf("Run events len = %d, want %d: %+v", len(events), len(want), events)
+	}
+	if events[0] != want[0] || events[2] != want[2] || events[4] != want[4] || events[5] != want[5] {
 		t.Fatalf("Run events = %+v, want %+v", events, want)
+	}
+	if !strings.HasPrefix(events[1], "remote:mkdir -p '/opt/app' && mkdir -p '/root/.ship/releases/") {
+		t.Fatalf("Run mkdir events = %q", events[1])
+	}
+	if !strings.HasPrefix(events[3], "remote:cp '/opt/app/release.tar.gz' '/root/.ship/releases/") || !strings.HasSuffix(events[3], "/00-release.tar.gz'") {
+		t.Fatalf("Run backup events = %q", events[3])
 	}
 }
 

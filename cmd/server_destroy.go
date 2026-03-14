@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,8 +37,9 @@ func newServerDestroyCommand() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("STATUS=SERVER_DESTROYED")
-			return nil
+			return writeCommandOutput(cmd, "STATUS=SERVER_DESTROYED\n", map[string]any{
+				"status": "SERVER_DESTROYED",
+			})
 		},
 	}
 }

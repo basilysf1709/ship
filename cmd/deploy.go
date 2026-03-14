@@ -23,32 +23,36 @@ func newDeployCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := cmd.OutOrStdout()
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
 			defer cancel()
 
 			opts := shipinternal.Options{}
 			serverIP := ""
+			payload := map[string]any{
+				"status": "DEPLOY_COMPLETE",
+			}
 			if deployConfig.RequiresServer() {
 				state, err := loadServerState()
 				if err != nil {
 					return err
 				}
 				opts.ServerIP = state.IP
+				opts.ServerID = state.ServerID
 				opts.User = state.EffectiveSSHUser()
 				serverIP = state.IP
+				payload["server_ip"] = serverIP
 			}
 
 			if err := runDeploy(ctx, opts); err != nil {
 				return err
 			}
 
-			fmt.Fprint(out, "STATUS=DEPLOY_COMPLETE\n")
+			text := "STATUS=DEPLOY_COMPLETE\n"
 			if serverIP != "" {
-				fmt.Fprintf(out, "SERVER_IP=%s\n", serverIP)
+				text += fmt.Sprintf("SERVER_IP=%s\n", serverIP)
 			}
-			return nil
+			return writeCommandOutput(cmd, text, payload)
 		},
 	}
 }

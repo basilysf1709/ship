@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -34,8 +33,10 @@ func newLogsCommand() *cobra.Command {
 				return err
 			}
 
-			fmt.Print(output)
-			return nil
+			return writeCommandOutput(cmd, output, map[string]any{
+				"server_ip": state.IP,
+				"output":    output,
+			})
 		},
 	}
 }
