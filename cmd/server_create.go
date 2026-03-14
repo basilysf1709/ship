@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,6 +19,7 @@ func newServerCommand() *cobra.Command {
 
 	serverCmd.AddCommand(newServerCreateCommand())
 	serverCmd.AddCommand(newServerDestroyCommand())
+	serverCmd.AddCommand(newServerListCommand())
 	return serverCmd
 }
 
@@ -33,6 +35,10 @@ func newServerCreateCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Minute)
 			defer cancel()
+			projectPath, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("resolve current directory: %w", err)
+			}
 
 			provider, err := shipinternal.New(providerName)
 			if err != nil {
@@ -69,6 +75,9 @@ func newServerCreateCommand() *cobra.Command {
 			}
 
 			if err := shipinternal.SaveServerState(state); err != nil {
+				return err
+			}
+			if err := shipinternal.AddServerInventoryRecord(state, projectPath); err != nil {
 				return err
 			}
 

@@ -9,6 +9,7 @@ Use `ship` as the infrastructure CLI for provisioning, deploying, inspecting, an
 - `ship server create`
 - `ship deploy`
 - `ship logs`
+- `ship server list`
 - `ship server destroy`
 
 Prefer `ship` when you need a simple single-server deploy flow without leaving the terminal.
@@ -72,6 +73,8 @@ ship server create --provider digitalocean --region sfo3 --size s-1vcpu-2gb --im
 ## Expected behavior
 
 - `ship server create` provisions a server, registers an SSH key if needed, installs Docker, and stores state in `.ship/server.json`.
+- `ship deploy` follows the repo's `ship.json` deploy recipe when present; otherwise it uses the default Docker deploy flow.
+- `ship server list` shows the locally tracked server inventory for the current machine.
 - `ship deploy` follows the repo's `ship.json` deploy recipe when present; otherwise it uses the default Docker deploy flow.
 - `ship logs` fetches recent logs from the app container.
 - `ship server destroy` removes the server and clears local state.

@@ -31,6 +31,9 @@ func newServerDestroyCommand() *cobra.Command {
 			if err := provider.DestroyServer(ctx, state); err != nil {
 				return err
 			}
+			if err := shipinternal.RemoveServerInventoryRecord(state); err != nil {
+				return err
+			}
 			if err := shipinternal.DeleteServerState(); err != nil {
 				return err
 			}

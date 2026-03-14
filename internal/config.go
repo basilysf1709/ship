@@ -6,10 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 )
 
 const shipDir = ".ship"
 const serverFile = "server.json"
+const inventoryFile = "servers.json"
+
+var userHomeDir = os.UserHomeDir
 
 type ServerState struct {
 	Provider string `json:"provider,omitempty"`
@@ -18,8 +23,25 @@ type ServerState struct {
 	SSHUser  string `json:"ssh_user,omitempty"`
 }
 
+type ServerRecord struct {
+	Provider    string `json:"provider,omitempty"`
+	ServerID    string `json:"server_id"`
+	IP          string `json:"ip"`
+	SSHUser     string `json:"ssh_user,omitempty"`
+	ProjectPath string `json:"project_path,omitempty"`
+	CreatedAt   string `json:"created_at,omitempty"`
+}
+
 func serverStatePath() string {
 	return filepath.Join(shipDir, serverFile)
+}
+
+func inventoryPath() (string, error) {
+	home, err := userHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user home directory: %w", err)
+	}
+	return filepath.Join(home, shipDir, inventoryFile), nil
 }
 
 func SaveServerState(state ServerState) error {
@@ -75,4 +97,109 @@ func (s ServerState) EffectiveSSHUser() string {
 		return "root"
 	}
 	return s.SSHUser
+}
+
+func (s ServerState) Link() string {
+	if s.IP == "" {
+		return ""
+	}
+	return "http://" + s.IP
+}
+
+func (r ServerRecord) Link() string {
+	if r.IP == "" {
+		return ""
+	}
+	return "http://" + r.IP
+}
+
+func ListServerInventory() ([]ServerRecord, error) {
+	path, err := inventoryPath()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return []ServerRecord{}, nil
+		}
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var records []ServerRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].CreatedAt > records[j].CreatedAt
+	})
+	return records, nil
+}
+
+func AddServerInventoryRecord(state ServerState, projectPath string) error {
+	records, err := ListServerInventory()
+	if err != nil {
+		return err
+	}
+
+	record := ServerRecord{
+		Provider:    state.Provider,
+		ServerID:    state.ServerID,
+		IP:          state.IP,
+		SSHUser:     state.EffectiveSSHUser(),
+		ProjectPath: projectPath,
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	replaced := false
+	for i := range records {
+		if records[i].Provider == record.Provider && records[i].ServerID == record.ServerID {
+			records[i] = record
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		records = append(records, record)
+	}
+
+	return saveServerInventory(records)
+}
+
+func RemoveServerInventoryRecord(state ServerState) error {
+	records, err := ListServerInventory()
+	if err != nil {
+		return err
+	}
+
+	filtered := records[:0]
+	for _, record := range records {
+		if record.Provider == state.Provider && record.ServerID == state.ServerID {
+			continue
+		}
+		filtered = append(filtered, record)
+	}
+
+	return saveServerInventory(filtered)
+}
+
+func saveServerInventory(records []ServerRecord) error {
+	path, err := inventoryPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create %s directory: %w", filepath.Dir(path), err)
+	}
+
+	data, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal server inventory: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
 }

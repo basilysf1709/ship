@@ -42,7 +42,8 @@ The goal is simple: give agents a tiny, deterministic interface for infrastructu
 1. **Create** a server with `ship server create`
 2. **Deploy** the current project with `ship deploy`
 3. **Inspect** the running app with `ship logs`
-4. **Destroy** the server with `ship server destroy`
+4. **List** locally tracked servers with `ship server list`
+5. **Destroy** the server with `ship server destroy`
 
 **Key features:**
 
@@ -138,7 +139,8 @@ ship server destroy
 
 | Command | Description |
 |---------|-------------|
-| `ship server create` | Create a server and install Docker |
+| `ship server create` | Create a server, install Docker, and track it locally |
+| `ship server list` | Show a table of locally tracked servers on this machine |
 | `ship deploy` | Run the project's configured deploy flow, or the default Docker deploy if no config is present |
 | `ship logs` | Fetch the last 100 log lines from the app container |
 | `ship server destroy` | Destroy the current server and remove local state |
@@ -244,6 +246,12 @@ Server metadata is stored locally in:
 
 ```text
 .ship/server.json
+```
+
+Machine-wide server inventory is stored in:
+
+```text
+~/.ship/servers.json
 ```
 
 Example:
