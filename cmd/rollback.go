@@ -23,7 +23,7 @@ func newRollbackCommand() *cobra.Command {
 			if len(args) == 1 {
 				target, err = findReleaseRecord(args[0])
 			} else {
-				target, err = previousReleaseRecord()
+				target, err = defaultRollbackTargetRecord()
 			}
 			if err != nil {
 				return err
@@ -31,8 +31,12 @@ func newRollbackCommand() *cobra.Command {
 			if target == nil {
 				return fmt.Errorf("no rollback target available")
 			}
-			if len(target.Uploads) == 0 && len(target.RemoteCommands) == 0 {
-				return fmt.Errorf("release %s cannot be rolled back automatically", target.ID)
+			if !target.RollbackEligible {
+				reason := target.RollbackReason
+				if reason == "" {
+					reason = "release is not rollback eligible"
+				}
+				return fmt.Errorf("release %s cannot be rolled back automatically: %s", target.ID, reason)
 			}
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Minute)
@@ -60,9 +64,20 @@ func newRollbackCommand() *cobra.Command {
 				return err
 			}
 
-			record := shipinternal.NewReleaseRecord(&state, target.RemoteCommands, target.Uploads)
+			record, err := shipinternal.NewReleaseRecord(&state, shipinternal.DeployConfig{
+				RemoteCommands: append([]string(nil), target.RemoteCommands...),
+			})
+			if err != nil {
+				return err
+			}
 			record.Status = "rollback"
+			record.Stage = "complete"
 			record.RollbackOf = target.ID
+			record.DeployHash = target.DeployHash
+			record.SecretsChecksum = target.SecretsChecksum
+			record.Uploads = append([]shipinternal.ReleaseUpload(nil), target.Uploads...)
+			record.ErrorMessage = ""
+			record.UpdateRollbackEligibility()
 			if err := saveReleaseRecord(record); err != nil {
 				return err
 			}

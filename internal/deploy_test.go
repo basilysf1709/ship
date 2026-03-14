@@ -243,3 +243,52 @@ func TestRunCleansGeneratedArtifactWhenLaterLocalCommandFails(t *testing.T) {
 		t.Fatalf("release.tar.gz still exists after failed local phase, stat err=%v", err)
 	}
 }
+
+func TestRunRecordsFailedReleaseAttempt(t *testing.T) {
+	originalLoadDeployConfig := loadDeployConfig
+	originalRunLocalCommand := runLocalCommand
+	defer func() {
+		loadDeployConfig = originalLoadDeployConfig
+		runLocalCommand = originalRunLocalCommand
+	}()
+
+	tempDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWD)
+	}()
+
+	loadDeployConfig = func() (DeployConfig, error) {
+		return DeployConfig{
+			LocalCommands: []string{"docker build -t app ."},
+			CleanupLocal:  []string{"app.tar"},
+		}, nil
+	}
+	runLocalCommand = func(ctx context.Context, command string) error {
+		return errors.New("build failed")
+	}
+
+	if err := Run(context.Background(), Options{}); err == nil {
+		t.Fatal("Run returned nil error")
+	}
+
+	records, err := ListReleaseHistory()
+	if err != nil {
+		t.Fatalf("ListReleaseHistory returned error: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("ListReleaseHistory len = %d, want 1", len(records))
+	}
+	if records[0].Status != "failed" || records[0].Stage != "local" {
+		t.Fatalf("release record = %+v", records[0])
+	}
+	if records[0].ErrorMessage == "" {
+		t.Fatalf("release record missing error message: %+v", records[0])
+	}
+}

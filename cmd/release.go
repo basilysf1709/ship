@@ -32,13 +32,21 @@ func newReleaseListCommand() *cobra.Command {
 
 			var builder strings.Builder
 			tw := tabwriter.NewWriter(&builder, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tCREATED_AT\tGIT_SHA\tSERVER_IP\tSTATUS\tROLLBACK_OF")
+			fmt.Fprintln(tw, "ID\tCREATED_AT\tGIT_SHA\tSERVER_IP\tSTATUS\tSTAGE\tROLLBACK")
 			for _, record := range records {
 				gitSHA := record.GitSHA
 				if len(gitSHA) > 8 {
 					gitSHA = gitSHA[:8]
 				}
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", record.ID, record.CreatedAt, gitSHA, record.ServerIP, record.Status, record.RollbackOf)
+				rollback := record.RollbackOf
+				if rollback == "" {
+					if record.RollbackEligible {
+						rollback = "eligible"
+					} else {
+						rollback = record.RollbackReason
+					}
+				}
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", record.ID, record.CreatedAt, gitSHA, record.ServerIP, record.Status, record.Stage, rollback)
 			}
 			_ = tw.Flush()
 			builder.WriteString(fmt.Sprintf("TOTAL_RELEASES=%d\n", len(records)))

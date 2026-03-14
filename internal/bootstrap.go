@@ -65,6 +65,9 @@ func SyncSecretsToServer(ctx context.Context, client *ssh.Client) error {
 	if !HasLocalSecrets() {
 		return nil
 	}
+	if _, err := SecretsChecksum(); err != nil {
+		return err
+	}
 	if err := RunCommands(ctx, client, []string{"mkdir -p /root/.ship"}); err != nil {
 		return err
 	}

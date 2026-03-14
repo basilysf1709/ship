@@ -43,6 +43,12 @@ func newSecretsSetCommand() *cobra.Command {
 				if len(parts) != 2 || parts[0] == "" {
 					return fmt.Errorf("invalid secret %q; expected KEY=VALUE", arg)
 				}
+				if err := shipinternal.ValidateSecretKey(parts[0]); err != nil {
+					return err
+				}
+				if err := shipinternal.ValidateSecretValue(parts[1]); err != nil {
+					return err
+				}
 				secrets[parts[0]] = parts[1]
 			}
 			if err := saveSecrets(secrets); err != nil {
@@ -79,17 +85,19 @@ func newSecretsListCommand() *cobra.Command {
 					builder.WriteString(fmt.Sprintf("%s\t%s\n", key, secrets[key]))
 				}
 			} else {
-				builder.WriteString("KEY\n")
+				builder.WriteString("KEY\tVALUE\n")
 				for _, key := range keys {
-					builder.WriteString(fmt.Sprintf("%s\n", key))
+					builder.WriteString(fmt.Sprintf("%s\t%s\n", key, maskSecretValue(secrets[key])))
 				}
 			}
 			builder.WriteString(fmt.Sprintf("TOTAL_SECRETS=%d\n", len(keys)))
 
 			payload := map[string]any{
-				"count":   len(keys),
-				"keys":    keys,
-				"secrets": secrets,
+				"count": len(keys),
+				"keys":  keys,
+			}
+			if showValues {
+				payload["secrets"] = secrets
 			}
 			return writeCommandOutput(cmd, builder.String(), payload)
 		},
@@ -123,6 +131,17 @@ func newSecretsRemoveCommand() *cobra.Command {
 				"count":  len(secrets),
 			})
 		},
+	}
+}
+
+func maskSecretValue(value string) string {
+	switch {
+	case value == "":
+		return "(empty)"
+	case len(value) <= 4:
+		return strings.Repeat("*", len(value))
+	default:
+		return value[:2] + strings.Repeat("*", len(value)-4) + value[len(value)-2:]
 	}
 }
 

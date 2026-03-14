@@ -27,21 +27,34 @@ var closeSSHClient = func(client *ssh.Client) error {
 	return client.Close()
 }
 
-func Run(ctx context.Context, opts Options) error {
+func Run(ctx context.Context, opts Options) (err error) {
 	deployConfig, err := loadDeployConfig()
 	if err != nil {
 		return err
 	}
+	releaseRecord, err := NewReleaseRecord(serverStateFromOptions(opts), deployConfig)
+	if err != nil {
+		return err
+	}
+	releaseRecord.Stage = "local"
+	defer func() {
+		releaseRecord.UpdateRollbackEligibility()
+		if saveErr := SaveReleaseRecord(releaseRecord); saveErr != nil && err == nil {
+			err = saveErr
+		}
+	}()
 
 	cleanupPaths := deployConfig.ResolvedCleanupPaths(".")
 	preexistingCleanupPaths, err := existingPaths(cleanupPaths)
 	if err != nil {
+		releaseRecord.ErrorMessage = err.Error()
 		return err
 	}
 	scheduledCleanupPaths := make(map[string]bool, len(cleanupPaths))
 
 	for _, command := range deployConfig.LocalCommands {
 		if err := runLocalCommand(ctx, command); err != nil {
+			releaseRecord.ErrorMessage = err.Error()
 			return err
 		}
 		for _, cleanupPath := range cleanupCandidates(cleanupPaths, preexistingCleanupPaths, scheduledCleanupPaths) {
@@ -52,9 +65,14 @@ func Run(ctx context.Context, opts Options) error {
 
 	uploads, err := deployConfig.ResolvedUploads(".")
 	if err != nil {
+		releaseRecord.ErrorMessage = err.Error()
 		return err
 	}
 	if opts.ServerIP != "" && HasLocalSecrets() {
+		if _, err := SecretsChecksum(); err != nil {
+			releaseRecord.ErrorMessage = err.Error()
+			return err
+		}
 		uploads = append(uploads, ResolvedDeployUpload{
 			Source:      secretsPath(),
 			Destination: remoteSecretsPath,
@@ -63,29 +81,36 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	if len(uploads) == 0 && len(deployConfig.RemoteCommands) == 0 {
-		return SaveReleaseRecord(NewReleaseRecord(serverStateFromOptions(opts), nil, nil))
+		releaseRecord.Status = "success"
+		releaseRecord.Stage = "complete"
+		return nil
 	}
 
+	releaseRecord.Stage = "connect"
 	client, err := waitForSSHClient(ctx, opts.User, opts.ServerIP, 10*time.Second)
 	if err != nil {
+		releaseRecord.ErrorMessage = err.Error()
 		return err
 	}
 	defer closeSSHClient(client)
 
-	releaseRecord := NewReleaseRecord(serverStateFromOptions(opts), deployConfig.RemoteCommands, nil)
 	releaseDir := path.Join(remoteReleaseRoot, releaseRecord.ID)
 
 	preCopyCommands := remoteUploadMkdirCommands(uploads)
 	if len(uploads) > 0 {
 		preCopyCommands = append(preCopyCommands, fmt.Sprintf("mkdir -p %s", shellQuote(releaseDir)))
 	}
+	releaseRecord.Stage = "prepare_remote"
 	if err := runRemoteCommands(ctx, client, preCopyCommands); err != nil {
+		releaseRecord.ErrorMessage = err.Error()
 		return err
 	}
 
 	releaseUploads := make([]ReleaseUpload, 0, len(uploads))
+	releaseRecord.Stage = "upload"
 	for _, upload := range uploads {
 		if err := copyDeployFile(ctx, client, upload.Source, upload.Destination, upload.Mode); err != nil {
+			releaseRecord.ErrorMessage = err.Error()
 			return err
 		}
 		if upload.Destination == remoteSecretsPath {
@@ -95,6 +120,7 @@ func Run(ctx context.Context, opts Options) error {
 		if err := runRemoteCommands(ctx, client, []string{
 			fmt.Sprintf("cp %s %s", shellQuote(upload.Destination), shellQuote(backupPath)),
 		}); err != nil {
+			releaseRecord.ErrorMessage = err.Error()
 			return err
 		}
 		releaseUploads = append(releaseUploads, ReleaseUpload{
@@ -103,12 +129,17 @@ func Run(ctx context.Context, opts Options) error {
 		})
 	}
 
+	releaseRecord.Stage = "remote"
 	if err := runRemoteCommands(ctx, client, deployConfig.RemoteCommands); err != nil {
+		releaseRecord.ErrorMessage = err.Error()
 		return err
 	}
 
 	releaseRecord.Uploads = releaseUploads
-	return SaveReleaseRecord(releaseRecord)
+	releaseRecord.Status = "success"
+	releaseRecord.Stage = "complete"
+	releaseRecord.ErrorMessage = ""
+	return nil
 }
 
 func runLocalShellCommand(ctx context.Context, command string) error {

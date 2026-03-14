@@ -17,12 +17,16 @@ var configureProxy = shipinternal.ConfigureProxy
 var syncSecretsToServer = shipinternal.SyncSecretsToServer
 var latestReleaseRecord = shipinternal.LatestReleaseRecord
 var previousReleaseRecord = shipinternal.PreviousReleaseRecord
+var defaultRollbackTargetRecord = shipinternal.DefaultRollbackTargetRecord
 var findReleaseRecord = shipinternal.FindReleaseRecord
 var saveReleaseRecord = shipinternal.SaveReleaseRecord
 var listReleaseHistory = shipinternal.ListReleaseHistory
 var listReleaseHistoryAt = shipinternal.ListReleaseHistoryAt
 var loadProjectConfig = shipinternal.LoadProjectConfig
 var loadCurrentServerState = shipinternal.LoadServerState
+var currentGitSHA = shipinternal.CurrentGitSHA
+var currentSecretsChecksum = shipinternal.SecretsChecksum
+var deployConfigHash = shipinternal.DeployConfigHash
 
 func currentServerClient(ctx context.Context, timeout time.Duration) (shipinternal.ServerState, *ssh.Client, error) {
 	state, err := loadCurrentServerState()
