@@ -16,10 +16,10 @@ Prefer `ship` when you need a simple single-server deploy flow without leaving t
 ## Requirements
 
 - `ship` installed and available on `PATH`
-- Docker installed locally
-- A `Dockerfile` in the current project
 - A local SSH key available on this machine
 - One cloud provider token set in the environment
+- Docker installed locally if the repo uses the default deploy flow
+- A `Dockerfile` in the current project if the repo uses the default deploy flow
 
 ## Supported providers
 
@@ -72,7 +72,7 @@ ship server create --provider digitalocean --region sfo3 --size s-1vcpu-2gb --im
 ## Expected behavior
 
 - `ship server create` provisions a server, registers an SSH key if needed, installs Docker, and stores state in `.ship/server.json`.
-- `ship deploy` builds the local Docker image, uploads it, and runs the container on the server.
+- `ship deploy` follows the repo's `ship.json` deploy recipe when present; otherwise it uses the default Docker deploy flow.
 - `ship logs` fetches recent logs from the app container.
 - `ship server destroy` removes the server and clears local state.
 
@@ -90,7 +90,7 @@ Parse these values instead of relying on prose.
 
 ## Guardrails
 
-- Do not call `ship deploy` unless the current repository has a valid `Dockerfile`.
+- Do not call `ship deploy` unless the current repository has either a valid `ship.json` deploy config or a valid `Dockerfile`.
 - Do not call `ship server destroy` unless teardown is intended.
 - If `.ship/server.json` is missing, assume no server is currently tracked.
 - If server creation succeeds but SSH access fails, check that the local private key matches the uploaded public key.

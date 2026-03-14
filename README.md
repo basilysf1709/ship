@@ -51,7 +51,7 @@ The goal is simple: give agents a tiny, deterministic interface for infrastructu
 - **Provider support**: DigitalOcean, Hetzner, and Vultr
 - **Deterministic output**: machine-friendly `KEY=VALUE` responses
 - **No dashboard required**: everything happens from the terminal
-- **Docker-first deploy flow**: build locally, upload image, run container
+- **Configurable deploy flow**: use `ship.json` for project-specific deploy steps
 - **Local state tracking**: server metadata stored in `.ship/server.json`
 
 ## Build
@@ -121,9 +121,9 @@ If a matching local private key is not available, server creation can succeed bu
 ## Requirements
 
 - Go
-- Docker installed locally
-- A `Dockerfile` in the current project
 - A local SSH key on this machine, either in `~/.ssh/` or loaded in `ssh-agent`
+- Docker installed locally if you use the default deploy flow
+- A `Dockerfile` in the current project if you use the default deploy flow
 
 ## Usage
 
@@ -139,7 +139,7 @@ ship server destroy
 | Command | Description |
 |---------|-------------|
 | `ship server create` | Create a server and install Docker |
-| `ship deploy` | Build Docker image locally and deploy it to the server |
+| `ship deploy` | Run the project's configured deploy flow, or the default Docker deploy if no config is present |
 | `ship logs` | Fetch the last 100 log lines from the app container |
 | `ship server destroy` | Destroy the current server and remove local state |
 
@@ -172,7 +172,50 @@ ship server create --provider vultr --region ord --size vc2-1c-2gb --image "Ubun
 
 ## Deploy Flow
 
-`ship deploy` assumes a `Dockerfile` exists in the current repository and runs:
+`ship deploy` looks for a `ship.json` file in the current directory. If it finds a `deploy` block, it runs that deploy recipe. If `ship.json` is missing, it falls back to the default Docker-based flow.
+
+### Configurable deploys
+
+Example `ship.json`:
+
+```json
+{
+  "deploy": {
+    "local_commands": [
+      "npm ci",
+      "npm run build",
+      "tar -czf release.tar.gz dist package.json"
+    ],
+    "uploads": [
+      {
+        "source": "release.tar.gz",
+        "destination": "/opt/app/release.tar.gz",
+        "mode": "0644"
+      }
+    ],
+    "remote_commands": [
+      "mkdir -p /opt/app",
+      "cd /opt/app && tar -xzf release.tar.gz",
+      "cd /opt/app && npm ci --omit=dev",
+      "cd /opt/app && pm2 restart app || pm2 start npm --name app -- start"
+    ],
+    "cleanup_local": [
+      "release.tar.gz"
+    ]
+  }
+}
+```
+
+Fields:
+
+- `local_commands`: shell commands run on the local machine before upload
+- `uploads`: files to copy to the server, with `source`, `destination`, and optional quoted octal `mode`
+- `remote_commands`: shell commands run on the server in order
+- `cleanup_local`: local files removed after deploy finishes
+
+### Default deploy flow
+
+If no `ship.json` deploy config exists, `ship deploy` assumes a `Dockerfile` exists and runs:
 
 ```bash
 docker build -t app .

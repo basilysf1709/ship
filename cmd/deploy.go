@@ -10,27 +10,44 @@ import (
 	shipinternal "ship/internal"
 )
 
+var loadDeployConfig = shipinternal.LoadDeployConfig
+var loadServerState = shipinternal.LoadServerState
+var runDeploy = shipinternal.Run
+
 func newDeployCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "deploy",
 		Short: "Deploy the current project",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			state, err := shipinternal.LoadServerState()
+			deployConfig, err := loadDeployConfig()
 			if err != nil {
 				return err
 			}
+			out := cmd.OutOrStdout()
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
 			defer cancel()
 
-			if err := shipinternal.Run(ctx, shipinternal.Options{
-				ServerIP: state.IP,
-				User:     state.EffectiveSSHUser(),
-			}); err != nil {
+			opts := shipinternal.Options{}
+			serverIP := ""
+			if deployConfig.RequiresServer() {
+				state, err := loadServerState()
+				if err != nil {
+					return err
+				}
+				opts.ServerIP = state.IP
+				opts.User = state.EffectiveSSHUser()
+				serverIP = state.IP
+			}
+
+			if err := runDeploy(ctx, opts); err != nil {
 				return err
 			}
 
-			fmt.Printf("STATUS=DEPLOY_COMPLETE\nSERVER_IP=%s\n", state.IP)
+			fmt.Fprint(out, "STATUS=DEPLOY_COMPLETE\n")
+			if serverIP != "" {
+				fmt.Fprintf(out, "SERVER_IP=%s\n", serverIP)
+			}
 			return nil
 		},
 	}
