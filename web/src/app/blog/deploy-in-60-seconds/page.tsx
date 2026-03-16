@@ -1,15 +1,39 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "@/components/code-block";
+import { BlogPostingJsonLd } from "@/lib/json-ld";
 
-export const metadata = {
-  title: "Deploy an App in 60 Seconds - Ship Blog",
+export const metadata: Metadata = {
+  title: "Deploy an App in 60 Seconds",
   description:
-    "A walkthrough of going from zero to a live server with Ship.",
+    "A walkthrough of going from zero to a live server with a single CLI tool.",
+  alternates: { canonical: "/blog/deploy-in-60-seconds" },
+  openGraph: {
+    type: "article",
+    title: "Deploy an App in 60 Seconds",
+    description:
+      "A walkthrough of going from zero to a live server with a single CLI tool.",
+    url: "/blog/deploy-in-60-seconds",
+    publishedTime: "2026-03-14T00:00:00Z",
+    authors: ["Basil Yusuf"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Deploy an App in 60 Seconds",
+    description:
+      "A walkthrough of going from zero to a live server with a single CLI tool.",
+  },
 };
 
 export default function DeployPost() {
   return (
     <article className="mx-auto max-w-3xl px-6 pb-20 pt-16">
+      <BlogPostingJsonLd
+        headline="Deploy an App in 60 Seconds"
+        description="A walkthrough of going from zero to a live server with a single CLI tool."
+        datePublished="2026-03-14"
+        slug="deploy-in-60-seconds"
+      />
       <Link
         href="/blog"
         className="text-sm text-muted transition-colors hover:text-foreground"

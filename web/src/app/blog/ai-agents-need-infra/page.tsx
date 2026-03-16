@@ -1,14 +1,38 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogPostingJsonLd } from "@/lib/json-ld";
 
-export const metadata = {
-  title: "AI Agents Need Infrastructure Tools - Ship Blog",
+export const metadata: Metadata = {
+  title: "AI Agents Need Infrastructure Tools",
   description:
     "Why AI coding agents struggle with deployment and how Ship solves it.",
+  alternates: { canonical: "/blog/ai-agents-need-infra" },
+  openGraph: {
+    type: "article",
+    title: "AI Agents Need Infrastructure Tools",
+    description:
+      "Why AI coding agents struggle with deployment and how Ship solves it.",
+    url: "/blog/ai-agents-need-infra",
+    publishedTime: "2026-03-13T00:00:00Z",
+    authors: ["Basil Yusuf"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Agents Need Infrastructure Tools",
+    description:
+      "Why AI coding agents struggle with deployment and how Ship solves it.",
+  },
 };
 
 export default function AIAgentsPost() {
   return (
     <article className="mx-auto max-w-3xl px-6 pb-20 pt-16">
+      <BlogPostingJsonLd
+        headline="AI Agents Need Infrastructure Tools"
+        description="Why AI coding agents struggle with deployment and how Ship solves it."
+        datePublished="2026-03-13"
+        slug="ai-agents-need-infra"
+      />
       <Link
         href="/blog"
         className="text-sm text-muted transition-colors hover:text-foreground"

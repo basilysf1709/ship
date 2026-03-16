@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata = {
-  title: "Blog - Ship",
-  description: "Articles about Ship, infrastructure, and AI-driven deployment.",
+export const metadata: Metadata = {
+  title: "Blog",
+  description:
+    "Articles about Ship, infrastructure automation, and AI-driven deployment.",
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    title: "Ship Blog",
+    description:
+      "Articles about Ship, infrastructure automation, and AI-driven deployment.",
+    url: "/blog",
+  },
 };
 
 const posts = [

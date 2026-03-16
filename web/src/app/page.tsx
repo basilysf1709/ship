@@ -3,9 +3,32 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/code-block";
 import { Step } from "@/components/step";
 
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Ship",
+  description:
+    "A lightweight infrastructure CLI for provisioning, deploying, and managing cloud servers. Built for AI coding agents.",
+  url: "https://shipinfra.dev",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Linux",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: {
+    "@type": "Person",
+    name: "Basil Yusuf",
+    url: "https://github.com/basilysf1709",
+  },
+  codeRepository: "https://github.com/basilysf1709/ship",
+  license: "https://opensource.org/licenses/MIT",
+};
+
 export default function Home() {
   return (
     <div className="mx-auto max-w-3xl px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+      />
       {/* Hero */}
       <section className="pb-16 pt-24 text-center">
         <Image

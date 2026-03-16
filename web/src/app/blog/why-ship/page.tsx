@@ -1,14 +1,38 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogPostingJsonLd } from "@/lib/json-ld";
 
-export const metadata = {
-  title: "Why Ship Exists - Ship Blog",
+export const metadata: Metadata = {
+  title: "Why Ship Exists",
   description:
     "The problem with cloud dashboards and why we built a terminal-first infrastructure CLI.",
+  alternates: { canonical: "/blog/why-ship" },
+  openGraph: {
+    type: "article",
+    title: "Why Ship Exists",
+    description:
+      "The problem with cloud dashboards and why we built a terminal-first infrastructure CLI.",
+    url: "/blog/why-ship",
+    publishedTime: "2026-03-15T00:00:00Z",
+    authors: ["Basil Yusuf"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Why Ship Exists",
+    description:
+      "The problem with cloud dashboards and why we built a terminal-first infrastructure CLI.",
+  },
 };
 
 export default function WhyShipPost() {
   return (
     <article className="mx-auto max-w-3xl px-6 pb-20 pt-16">
+      <BlogPostingJsonLd
+        headline="Why Ship Exists"
+        description="The problem with cloud dashboards and why we built a terminal-first infrastructure CLI."
+        datePublished="2026-03-15"
+        slug="why-ship"
+      />
       <Link
         href="/blog"
         className="text-sm text-muted transition-colors hover:text-foreground"

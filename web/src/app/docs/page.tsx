@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import { CodeBlock } from "@/components/code-block";
 
-export const metadata = {
-  title: "Docs - Ship",
-  description: "Documentation for the Ship infrastructure CLI.",
+export const metadata: Metadata = {
+  title: "Documentation",
+  description:
+    "Complete command reference and configuration guide for the Ship infrastructure CLI.",
+  alternates: { canonical: "/docs" },
+  openGraph: {
+    title: "Ship Documentation",
+    description:
+      "Complete command reference and configuration guide for the Ship infrastructure CLI.",
+    url: "/docs",
+  },
 };
 
 export default function DocsPage() {
